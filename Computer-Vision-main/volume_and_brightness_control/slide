@@ -1,0 +1,60 @@
+import cv2
+import mediapipe as mp
+import pyautogui
+import numpy as np
+
+# Initialize Mediapipe Hand module
+mp_hands = mp.solutions.hands
+hands = mp_hands.Hands(min_detection_confidence=0.7, min_tracking_confidence=0.7)
+mp_draw = mp.solutions.drawing_utils
+
+# Initialize variables to track swipe direction
+previous_x = None
+gesture_threshold = 40  # Minimum pixel distance for a gesture
+
+# Start video capture
+cap = cv2.VideoCapture(0)
+
+while cap.isOpened():
+    ret, frame = cap.read()
+    if not ret:
+        break
+
+    # Flip and process the frame
+    frame = cv2.flip(frame, 1)
+    rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+    result = hands.process(rgb_frame)
+
+    if result.multi_hand_landmarks:
+        for hand_landmarks in result.multi_hand_landmarks:
+            mp_draw.draw_landmarks(frame, hand_landmarks, mp_hands.HAND_CONNECTIONS)
+
+            # Extract palm base position (wrist)
+            wrist = hand_landmarks.landmark[mp_hands.HandLandmark.WRIST]
+            current_x = int(wrist.x * frame.shape[1])  # Convert to pixel value
+
+            # Detect swipe gesture
+            if previous_x is not None:
+                swipe_distance = current_x - previous_x
+
+                if swipe_distance > gesture_threshold:  # Right swipe
+                    pyautogui.press("right")  # Next slide
+                    print("Next Slide")
+                    previous_x = None  # Reset after a gesture
+                elif swipe_distance < -gesture_threshold:  # Left swipe
+                    pyautogui.press("left")  # Previous slide
+                    print("Previous Slide")
+                    previous_x = None  # Reset after a gesture
+            else:
+                previous_x = current_x  # Initialize tracking
+
+    # Display the frame
+    cv2.imshow("Hand Gesture Control for PPT", frame)
+
+    # Break loop on 'q' key press
+    if cv2.waitKey(1) & 0xFF == ord('q'):
+        break
+
+# Release resources
+cap.release()
+cv2.destroyAllWindows()
